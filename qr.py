@@ -65,7 +65,7 @@ def submit_changke_qr(
             data,
             classroom_client.get_qr_device_id(),
         )
-    except ClassroomServiceError as exc:
+    except PluginServiceError as exc:
         return {
             "attempted": True,
             "success": False,
@@ -175,7 +175,7 @@ def register_qr_assistant_routes(
             decoded = scanner.scan_image(image_bytes)
         except HTTPException:
             raise
-        except ClassroomServiceError as exc:
+        except PluginServiceError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except QRScannerUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
