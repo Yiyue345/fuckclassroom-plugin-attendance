@@ -1,0 +1,36 @@
+{
+  "id": "attendance",
+  "name": "二维码签到",
+  "version": "0.1.0",
+  "api_version": 1,
+  "app_requires": ">=0.1,<0.3",
+  "description": "识别畅课/课堂派二维码并处理签到。",
+  "requires": [
+    "classroom"
+  ],
+  "python_requires": [
+    {
+      "requirement": "cryptography>=43.0",
+      "import": "cryptography",
+      "label": "cryptography",
+      "optional": false
+    },
+    {
+      "requirement": "numpy>=1.24",
+      "import": "numpy",
+      "label": "NumPy",
+      "optional": false
+    },
+    {
+      "requirement": "opencv-python>=4.8",
+      "import": "cv2",
+      "label": "OpenCV",
+      "optional": false
+    }
+  ],
+  "execution": "in_process",
+  "entry": "plugin.py",
+  "route_prefix": null,
+  "rpc_api_version": null,
+  "rpc_permissions": []
+}
