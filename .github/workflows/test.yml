@@ -46,6 +46,10 @@ jobs:
             echo "Attendance Worker must load local package modules" >&2
             exit 1
           fi
+          if grep -REn 'fuckclassroom\.classroom' --include='*.py' . --exclude-dir=.git; then
+            echo "Attendance must consume Classroom through the service contract" >&2
+            exit 1
+          fi
           grep -F 'from .scanner import (' worker.py
       - name: Smoke-build Registry v1 artifact
         run: |
