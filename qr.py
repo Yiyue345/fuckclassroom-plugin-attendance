@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import threading
+from typing import Any, Protocol
 from urllib.parse import urljoin
 
 from fastapi import APIRouter, HTTPException
 
-from fuckclassroom.classroom import ClassroomClient, ClassroomClientError
+from fuckclassroom.core.plugins import PluginServiceError
 from .ketangpai import (
     KetangpaiAuthenticationError,
     KetangpaiClient,
@@ -21,6 +22,18 @@ from .scanner import (
 from fuckclassroom.core.config import AppConfig
 
 
+class ClassroomService(Protocol):
+    def answer_qr_rollcall(
+        self, rollcall_id: str, data: str, device_id: str
+    ) -> dict[str, Any]: ...
+
+    def get_qr_device_id(self) -> str: ...
+
+    def list_live_ppt_slides(self, course_id: str, lesson_id: str) -> list[Any]: ...
+
+    def download_live_ppt_image(self, url: str) -> tuple[bytes, str]: ...
+
+
 GUET_CHANGKE_BASE_URL = "https://courses.guet.edu.cn/"
 
 _SIGN_MESSAGES = {
@@ -33,7 +46,7 @@ _SIGN_MESSAGES = {
 
 
 def submit_changke_qr(
-    classroom_client: ClassroomClient,
+    classroom_client: ClassroomService,
     fields: dict[str, object],
 ) -> dict[str, object]:
     rollcall_id = str(fields.get("rollcallId") or "").strip()
@@ -52,7 +65,7 @@ def submit_changke_qr(
             data,
             classroom_client.get_qr_device_id(),
         )
-    except ClassroomClientError as exc:
+    except PluginServiceError as exc:
         return {
             "attempted": True,
             "success": False,
@@ -129,12 +142,13 @@ def register_qr_assistant_routes(
     app: APIRouter,
     config: AppConfig | None = None,
     *,
-    classroom_client: ClassroomClient | None = None,
+    classroom_client: ClassroomService | None = None,
     ketangpai_client: KetangpaiClient | None = None,
     scanner: WxScanService | None = None,
 ) -> None:
     app_config = config or AppConfig()
-    classroom_client = classroom_client or ClassroomClient(app_config)
+    if classroom_client is None:
+        raise PluginServiceError("课堂插件未启用")
     ketangpai_client = ketangpai_client or KetangpaiClient(
         KetangpaiCredentialStore(app_config.data_dir / "account" / "ketangpai.json")
     )
@@ -161,7 +175,7 @@ def register_qr_assistant_routes(
             decoded = scanner.scan_image(image_bytes)
         except HTTPException:
             raise
-        except ClassroomClientError as exc:
+        except PluginServiceError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except QRScannerUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc

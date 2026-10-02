@@ -21,6 +21,8 @@ FuckClassroom 的独立二维码签到插件，插件 ID 为 `attendance`。
 
 `fuckclassroom_wxscan` 原生扩展属于可选加速能力。若宿主已提供该扩展则优先使用；否则自动回退到 OpenCV QRCodeDetector，因此 Registry 包不声明本地路径依赖。
 
+签到插件通过宿主 `ServiceContainer` 注入的 `classroom_client` 调用课程插件能力，不直接依赖宿主中的 Classroom 实现模块。
+
 ## 开发
 
 开发分支为 `plugin-management`。合并到 `main` 后，CI 成功会自动发布 Registry v1 beta Release。
