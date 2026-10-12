@@ -1,0 +1,13 @@
+# Generated Registry artifacts and native extensions
+*.zip
+*.zip.sha256
+*.whl
+dist/
+.native-artifacts/
+native-out/
+native/_manifest.json
+native/*/*.so
+native/*/*.pyd
+__pycache__/
+*.pyc
+rust_module/wxscan_py/target/
