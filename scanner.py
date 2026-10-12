@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import importlib
 import json
 from pathlib import Path
 import threading
@@ -221,10 +220,9 @@ class WxScanService:
             if self._scanner is not None:
                 return self._scanner
             try:
-                native = importlib.import_module(
-                    ".native.fuckclassroom_wxscan",
-                    package=__package__,
-                )
+                from .native import load_native_extension
+
+                native = load_native_extension()
                 detect_path, sr_path = self._ensure_models()
                 self._scanner = native.Scanner(
                     detect_path.read_bytes(),
