@@ -10,6 +10,11 @@ permissions:
   contents: read
 
 jobs:
+  build-native:
+    uses: ./.github/workflows/build-native.yml
+    with:
+      source_ref: ${{ github.sha }}
+
   validate:
     runs-on: ubuntu-latest
     steps:
