@@ -7,6 +7,8 @@ import re
 import shutil
 import tempfile
 import zipfile
+
+from package_wxscan import verify as verify_native
 from pathlib import Path
 
 PLUGIN_ID = "attendance"
@@ -20,7 +22,7 @@ ROOT_FILES = (
     "lifecycle.py", "qr.py", "routes.py", "scanner.py", "services.py",
     "worker.py", "requirements.txt", "README.md",
 )
-TREE_DIRS = ("templates", "static")
+TREE_DIRS = ("templates", "static", "native")
 
 
 def validate_manifest(manifest: dict[str, object], version: str) -> None:
@@ -69,6 +71,8 @@ def build(version: str, root: Path) -> tuple[Path, Path]:
             for source in sorted(package.rglob("*")):
                 if source.is_file():
                     archive.write(source, source.relative_to(package).as_posix())
+
+    verify_native(root / "native")
 
     with zipfile.ZipFile(artifact) as archive:
         names = archive.namelist()
