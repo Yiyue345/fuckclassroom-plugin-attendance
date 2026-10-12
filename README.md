@@ -19,7 +19,18 @@ FuckClassroom 的独立二维码签到插件，插件 ID 为 `attendance`。
 - `numpy>=1.24`
 - `opencv-python>=4.8`
 
-`fuckclassroom_wxscan` 原生扩展属于可选加速能力。若宿主已提供该扩展则优先使用；否则自动回退到 OpenCV QRCodeDetector，因此 Registry 包不声明本地路径依赖。
+\`fuckclassroom_wxscan\` 原生扩展属于插件自己维护的可选能力，不再依赖宿主或主仓的 \`rust_module/wxscan_py\`。正式版与 beta Release 会构建 Linux x86_64、Windows x86_64、macOS x86_64 / Apple Silicon 的 PyO3 ABI3 二进制，按平台打包在 \`native/\` 下，并携带 SHA-256 manifest。
+
+扫码时先根据系统与 CPU 架构定位本插件自带的原生扩展，校验哈希后再加载；平台没有对应二进制、校验失败、原生模型不可用或初始化失败时自动回退 OpenCV QRCodeDetector。插件可在没有 Rust/Cargo 的电脑上安装，模型依然按需下载到宿主数据目录下的 \`models/wxscan\`。
+
+本地开发仅需要 OpenCV；需要调试 Rust 扩展时可在插件仓执行：
+
+\`\`\`bash
+python -m pip install "maturin>=1.7,<2"
+maturin build --release --manifest-path rust_module/wxscan_py/Cargo.toml --interpreter python --out dist
+\`\`\`
+
+GitHub Actions \`build-native.yml\` 统一负责正式版 / beta 的原生编译、stage、校验与 Registry ZIP 打包。
 
 签到插件通过宿主 `ServiceContainer` 注入的 `classroom_client` 调用课程插件能力，不直接依赖宿主中的 Classroom 实现模块。
 
