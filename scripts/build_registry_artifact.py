@@ -79,6 +79,14 @@ def build(version: str, root: Path) -> tuple[Path, Path]:
         if names.count("plugin.json") != 1 or any(name.startswith(f"{PLUGIN_ID}/") for name in names):
             raise ValueError("invalid Registry v1 ZIP layout")
         validate_manifest(json.loads(archive.read("plugin.json")), version)
+        # Match the host ZIP extraction limits even for multi-platform native packages.
+        maximum_total = 256 * 1024 * 1024
+        maximum_file = 128 * 1024 * 1024
+        contents = [item for item in archive.infolist() if not item.is_dir()]
+        if sum(item.file_size for item in contents) > maximum_total:
+            raise ValueError("Registry ZIP exceeds the host's 256 MiB extraction limit")
+        if any(item.file_size > maximum_file for item in contents):
+            raise ValueError("Registry ZIP has a file larger than the host's 128 MiB limit")
 
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     checksum.write_text(f"{digest}  {artifact.name}\n", encoding="utf-8")
