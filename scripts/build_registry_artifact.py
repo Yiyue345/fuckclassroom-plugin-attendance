@@ -7,6 +7,8 @@ import re
 import shutil
 import tempfile
 import zipfile
+
+from package_wxscan import verify as verify_native
 from pathlib import Path
 
 PLUGIN_ID = "attendance"
@@ -20,7 +22,7 @@ ROOT_FILES = (
     "lifecycle.py", "qr.py", "routes.py", "scanner.py", "services.py",
     "worker.py", "requirements.txt", "README.md",
 )
-TREE_DIRS = ("templates", "static")
+TREE_DIRS = ("templates", "static", "native")
 
 
 def validate_manifest(manifest: dict[str, object], version: str) -> None:
@@ -70,11 +72,21 @@ def build(version: str, root: Path) -> tuple[Path, Path]:
                 if source.is_file():
                     archive.write(source, source.relative_to(package).as_posix())
 
+    verify_native(root / "native")
+
     with zipfile.ZipFile(artifact) as archive:
         names = archive.namelist()
         if names.count("plugin.json") != 1 or any(name.startswith(f"{PLUGIN_ID}/") for name in names):
             raise ValueError("invalid Registry v1 ZIP layout")
         validate_manifest(json.loads(archive.read("plugin.json")), version)
+        # Match the host ZIP extraction limits even for multi-platform native packages.
+        maximum_total = 256 * 1024 * 1024
+        maximum_file = 128 * 1024 * 1024
+        contents = [item for item in archive.infolist() if not item.is_dir()]
+        if sum(item.file_size for item in contents) > maximum_total:
+            raise ValueError("Registry ZIP exceeds the host's 256 MiB extraction limit")
+        if any(item.file_size > maximum_file for item in contents):
+            raise ValueError("Registry ZIP has a file larger than the host's 128 MiB limit")
 
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     checksum.write_text(f"{digest}  {artifact.name}\n", encoding="utf-8")

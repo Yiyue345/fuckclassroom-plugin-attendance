@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import importlib
 import json
 from pathlib import Path
 import threading
@@ -221,9 +220,14 @@ class WxScanService:
             if self._scanner is not None:
                 return self._scanner
             try:
-                native = importlib.import_module("fuckclassroom_wxscan")
+                from .native import load_native_extension
+
+                native = load_native_extension()
                 detect_path, sr_path = self._ensure_models()
-                self._scanner = native.Scanner(detect_path.read_bytes(), sr_path.read_bytes())
+                self._scanner = native.Scanner(
+                    detect_path.read_bytes(),
+                    sr_path.read_bytes(),
+                )
             except Exception:  # noqa: BLE001 - the OpenCV backend is the recovery path.
                 self._scanner = self._create_opencv_scanner()
             return self._scanner
@@ -235,8 +239,8 @@ class WxScanService:
             import numpy
         except ImportError as fallback_exc:
             raise QRScannerUnavailable(
-                "二维码识别后端未安装；请重新安装 requirements.txt，或构建 "
-                "rust_module/wxscan_py 中的 wxscan 扩展"
+                "二维码识别后端不可用；请修复 Attendance 插件依赖，"
+                "或重新安装包含 wxscan 原生扩展的插件包"
             ) from fallback_exc
         return _OpenCVScanner(cv2, numpy)
 
