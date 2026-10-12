@@ -6,15 +6,10 @@ on:
     branches: ["main"]
 permissions:
   contents: write
+  actions: read
 jobs:
-  native:
-    if: github.event.workflow_run.conclusion == 'success'
-    uses: ./.github/workflows/build-native.yml
-    with:
-      source_ref: ${{ github.event.workflow_run.head_sha }}
   beta:
     if: github.event.workflow_run.conclusion == 'success'
-    needs: native
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +31,8 @@ jobs:
         with:
           pattern: wxscan-*
           path: .native-artifacts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
       - name: Bundle and verify wxscan extensions
         run: |
           python scripts/package_wxscan.py bundle --artifacts .native-artifacts --native native --require linux-x86_64 windows-x86_64 macos-x86_64 macos-aarch64
