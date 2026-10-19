@@ -6,6 +6,7 @@ on:
     branches: ["main"]
 permissions:
   contents: write
+  actions: read
 jobs:
   beta:
     if: github.event.workflow_run.conclusion == 'success'
@@ -25,6 +26,16 @@ jobs:
           with Path(os.environ["GITHUB_OUTPUT"]).open("a") as out:
               out.write(f"version={beta}\n")
               out.write(f"tag=v{beta}\n")
+      - name: Download platform wxscan extensions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wxscan-*
+          path: .native-artifacts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Bundle and verify wxscan extensions
+        run: |
+          python scripts/package_wxscan.py bundle --artifacts .native-artifacts --native native --require linux-x86_64 windows-x86_64 macos-x86_64 macos-aarch64
       - name: Build Registry artifact
         id: package
         run: |
@@ -33,6 +44,17 @@ jobs:
           echo "asset=attendance-${VERSION}.zip" >> "${GITHUB_OUTPUT}"
       - name: Verify checksum
         run: sha256sum -c "${{ steps.package.outputs.asset }}.sha256"
+      - name: Verify native modules in Registry ZIP
+        shell: python
+        run: |
+          import json, zipfile
+          from pathlib import Path
+          archive = next(Path(".").glob("attendance-*.zip"))
+          with zipfile.ZipFile(archive) as z:
+              data = json.loads(z.read("native/_manifest.json"))
+              assert len(data["platforms"]) == 4
+              for entry in data["platforms"].values():
+                  assert "native/" + entry["file"] in z.namelist()
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}

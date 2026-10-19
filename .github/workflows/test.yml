@@ -10,6 +10,11 @@ permissions:
   contents: read
 
 jobs:
+  build-native:
+    uses: ./.github/workflows/build-native.yml
+    with:
+      source_ref: ${{ github.sha }}
+
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -34,7 +39,7 @@ jobs:
           ]
           assert SpecifierSet(data["app_requires"]).contains(Version("0.2.0.dev0"), prereleases=True)
       - name: Check Python syntax
-        run: python -m compileall -q __init__.py plugin.py accounts.py ketangpai.py lifecycle.py qr.py routes.py scanner.py services.py worker.py scripts/build_registry_artifact.py
+        run: python -m compileall -q __init__.py plugin.py accounts.py ketangpai.py lifecycle.py qr.py routes.py scanner.py services.py worker.py native scripts tests
       - name: Check external plugin boundaries
         shell: bash
         run: |
@@ -51,7 +56,54 @@ jobs:
             exit 1
           fi
           grep -F 'from .scanner import (' worker.py
+      - name: Test wxscan native loader, wheel staging and checksum validation
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Assert the host native import is not used
+        run: |
+          grep -F 'from .native import load_native_extension' scanner.py
+          if grep -F 'import_module("fuckclassroom_wxscan")' scanner.py; then exit 1; fi
+          test -f rust_module/wxscan_py/src/lib.rs
+          test -f rust_module/wxscan_py/Cargo.toml
       - name: Smoke-build Registry v1 artifact
         run: |
           python scripts/build_registry_artifact.py 0.1.0-ci.0
           sha256sum -c attendance-0.1.0-ci.0.zip.sha256
+
+  package-native:
+    needs: [build-native, validate]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wxscan-*
+          path: .native-artifacts
+      - name: Bundle all platform binaries
+        run: |
+          python scripts/package_wxscan.py bundle --artifacts .native-artifacts --native native --require linux-x86_64 windows-x86_64 macos-x86_64 macos-aarch64
+      - name: Verify Linux native extension loads
+        run: |
+          python - <<'PY'
+          from native import load_native_extension
+          module = load_native_extension()
+          assert hasattr(module, "Scanner")
+          PY
+      - name: Verify actual Registry ZIP
+        run: |
+          python scripts/build_registry_artifact.py 0.1.0-ci.0
+          sha256sum -c attendance-0.1.0-ci.0.zip.sha256
+          python - <<'PY'
+          import hashlib
+          import json
+          import zipfile
+          with zipfile.ZipFile("attendance-0.1.0-ci.0.zip") as archive:
+              manifest = json.loads(archive.read("native/_manifest.json"))
+              assert len(manifest["platforms"]) == 4
+              for entry in manifest["platforms"].values():
+                  data = archive.read("native/" + entry["file"])
+                  assert hashlib.sha256(data).hexdigest() == entry["sha256"]
+          PY

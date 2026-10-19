@@ -1,0 +1,55 @@
+name: Build wxscan native extensions
+
+on:
+  workflow_call:
+    inputs:
+      source_ref:
+        description: Commit SHA to compile; never build an untrusted moving ref
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux-x86_64
+          - os: windows-2022
+            platform: windows-x86_64
+          - os: macos-15-intel
+            platform: macos-x86_64
+          - os: macos-15
+            platform: macos-aarch64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Select Rust toolchain
+        shell: bash
+        run: rustup update stable && rustup default stable
+      - name: Build PyO3 abi3 wheel
+        shell: bash
+        run: |
+          python -m pip install "maturin>=1.7,<2"
+          maturin build --release --manifest-path rust_module/wxscan_py/Cargo.toml --interpreter python --out dist
+      - name: Stage platform extension from wheel
+        shell: bash
+        run: |
+          python scripts/package_wxscan.py stage --wheels dist --platform "${{ matrix.platform }}" --output native-out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wxscan-${{ matrix.platform }}
+          path: native-out/*
+          if-no-files-found: error
+          retention-days: 7
